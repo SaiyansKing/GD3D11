@@ -265,14 +265,26 @@ public:
         // otherwise it results in D3DXERR_CAPSNOTSUPPORTED error
         // if this device don't have those resolutions report them anyway
 
-        bool have640x480 = false, have800x600 = false;
+        bool have640x480 = false, have800x600 = false; bool havecurrentresolution = false;
+        DWORD used_Width = 0, used_Height = 0;
         for ( DisplayModeInfo& mode : modes ) {
             if ( mode.Width == 640 && mode.Height == 480 )
                 have640x480 = true;
             if ( mode.Width == 800 && mode.Height == 600 )
                 have800x600 = true;
+            if ( mode.Width != 800 || mode.Width != 640 && mode.Height != 600 || mode.Height != 480 ) {
+                used_Width = mode.Width;
+                used_Height = mode.Height;
+                havecurrentresolution = true;
+            }
         }
 
+        if ( !havecurrentresolution && used_Width != 0 && used_Height != 0 ) { //use current used resolution when no resolution available to not have dialog boxes and menu in lower resolution (800x600) cut off due to world is automatically rendered at current resolution
+            DisplayModeInfo enfo;
+            enfo.Width = used_Width;
+            enfo.Height = used_Height;
+            modes.insert( modes.begin(), enfo );
+        }
         if ( !have800x600 ) {
             DisplayModeInfo enfo;
             enfo.Width = 800;
