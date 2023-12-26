@@ -1,4 +1,4 @@
-# GD3D11 (Gothic Direct3D 11) Renderer [![GitHub Actions](https://github.com/kirides/GD3D11/actions/workflows/build.yml/badge.svg)](https://github.com/Kirides/GD3D11/actions) [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/Kirides/GD3D11?include_prereleases)](https://github.com/Kirides/GD3D11/releases)
+# GD3D11 (Gothic Direct3D 11) Renderer [![GitHub Actions](https://github.com/SaiyansKing/GD3D11/actions/workflows/build.yml/badge.svg)](https://github.com/SaiyansKing/GD3D11/actions) [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/SaiyansKing/GD3D11?include_prereleases)](https://github.com/SaiyansKing/GD3D11/releases)
 
 This mod for the games **Gothic** and **Gothic II** brings the engine of those games into a more modern state. Through a custom implementation of the DirectDraw-API and using hooking and assembler-code-modifications of Gothic's internal engine calls, this mod completely replaces Gothic's old rendering architecture.
 
@@ -22,7 +22,7 @@ The new renderer is able to utilize more of the current GPU generation's power. 
 
 ## Installation & Usage
 > **Note**: In the past there used to be separate files for Gothic 1 and Gothic 2, this has now changed since the mod will automatically detect the game.
-1. Download the **GD3D11-*LATEST_VERSION*-ci.zip** file from the **Assets** section in the latest release of this repository (e.g. [kirides/releases](https://github.com/kirides/GD3D11/releases/latest)).
+1. Download the **GD3D11-*LATEST_VERSION*-ci.zip** file from the **Assets** section in the latest release of this repository (e.g. [SaiyansKing/releases](https://github.com/SaiyansKing/GD3D11/releases/latest)).
 3. Unpack the zip file and copy the content into the `Gothic\system\` or `Gothic2\system\` game folder.
 4. When starting the game you should see the version number of GD3D11 in the top-left corner.
 5. As soon as you start the game for the first time after the installation you should press F11 to open the renderer menu and press `Apply(*)`. This saves all the options to `Gothic(2)\system\GD3D11\UserSettings.ini`.
@@ -81,8 +81,8 @@ When using a Release target, those same exceptions will very likely stop the exe
 - [@lucifer602288](https://github.com/lucifer602288) (Keks1 @ WoG) for testing, helping with conversions and implementing several features.
 - [@SaiyansKing](https://github.com/SaiyansKing) for fixing a lot of issues and adding major features.
 
-<a href="https://github.com/kirides/GD3D11/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kirides/GD3D11" />
+<a href="https://github.com/SaiyansKing/GD3D11/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=SaiyansKing/GD3D11" />
 </a>
 
 ## License
