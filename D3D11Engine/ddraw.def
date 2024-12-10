@@ -23,3 +23,4 @@ EXPORTS
 	RegisterSpecialCase			= FakeRegisterSpecialCase			@21
 	ReleaseDDThreadLock			= HookedReleaseDDThreadLock			@22
 	UpdateCustomFontMultiplier	= UpdateCustomFontMultiplierFontRendering	@23
+	SetCustomSkyTexture			= SetCustomCloudAndNightTexture				@24

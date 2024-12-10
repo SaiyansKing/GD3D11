@@ -13,6 +13,7 @@
 #include "D3D11GraphicsEngine.h"
 
 #include <shlwapi.h>
+#include "GSky.h"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -238,6 +239,7 @@ struct ddraw_dll {
     FARPROC	RegisterSpecialCase;
     FARPROC	ReleaseDDThreadLock;
     FARPROC	UpdateCustomFontMultiplier;
+    FARPROC	SetCustomSkyTexture;
 } ddraw;
 
 HRESULT DoHookedDirectDrawCreateEx( GUID FAR* lpGuid, LPVOID* lplpDD, REFIID  iid, IUnknown FAR* pUnkOuter ) {
@@ -289,6 +291,14 @@ extern "C" float WINAPI  UpdateCustomFontMultiplierFontRendering( float multipli
     return engine ? engine->UpdateCustomFontMultiplierFontRendering( multiplier ) : 1.0;
 }
 
+
+extern "C" void WINAPI  SetCustomCloudAndNightTexture( int idxTexture, bool isNightTexture ) {
+    GSky* sky = Engine::GAPI->GetSky();
+    WorldInfo* currentWorld = Engine::GAPI->GetLoadedWorldInfo();
+    if ( sky && currentWorld ) {
+        sky->SetCustomCloudAndNightTexture( idxTexture, isNightTexture, currentWorld->WorldName == "OLDWORLD" || currentWorld->WorldName == "WORLD" );
+    }
+}
 
 __declspec(naked) void FakeAcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
 __declspec(naked) void FakeCheckFullscreen() { _asm { jmp[ddraw.CheckFullscreen] } }

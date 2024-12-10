@@ -45,6 +45,7 @@ struct ddraw_dll {
     FARPROC	GDX_OpenMessageBox;
 
     FARPROC	UpdateCustomFontMultiplier;
+    FARPROC	SetCustomSkyTexture;
 } ddraw;
 
 __declspec(naked) void FakeAcquireDDThreadLock() { _asm { jmp[ddraw.AcquireDDThreadLock] } }
@@ -83,6 +84,8 @@ __declspec(naked) void FakeGDX_SetWorldAOStrength() { _asm { jmp[ddraw.GDX_SetWo
 __declspec(naked) void FakeGDX_OpenMessageBox() { _asm { jmp[ddraw.GDX_OpenMessageBox] } }
 
 __declspec(naked) void FakeUpdateCustomFontMultiplier() { _asm { jmp[ddraw.UpdateCustomFontMultiplier] } }
+__declspec(naked) void FakeSetCustomSkyTexture() { _asm { jmp[ddraw.SetCustomSkyTexture] } }
+
 bool FakeIsUsingBGRATextures() { return true; }
 
 extern "C" HMODULE WINAPI FakeGDX_Module() {
@@ -291,6 +294,7 @@ BOOL APIENTRY DllMain( HINSTANCE hInst, DWORD reason, LPVOID ) {
         ddraw.GDX_SetWorldAOStrength = GetProcAddress( ddraw.dll, "GDX_SetWorldAOStrength" );
         ddraw.GDX_OpenMessageBox = GetProcAddress( ddraw.dll, "GDX_OpenMessageBox" );
         ddraw.UpdateCustomFontMultiplier = GetProcAddress( ddraw.dll, "UpdateCustomFontMultiplier" );
+        ddraw.SetCustomSkyTexture = GetProcAddress( ddraw.dll, "SetCustomSkyTexture" );
         
     } else if ( reason == DLL_PROCESS_DETACH ) {
         FreeLibrary( ddraw.dll );

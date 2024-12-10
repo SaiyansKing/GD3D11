@@ -49,6 +49,8 @@ public:
     /** Sets the current sky texture */
     void SetSkyTexture( ESkyTexture texture );
 
+    void SetCustomCloudAndNightTexture( int idx, bool isNightTexture, bool isOldWorld );
+    
     /** Returns the skyplane */
     MeshInfo* GetSkyPlane();
 
