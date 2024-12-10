@@ -271,3 +271,5 @@ redist*/
 /Launcher/ddraw.lib
 /Launcher/ddraw.exp
 /Launcher/ddraw.dll
+/Launcher/Launcher/Launcher.tlog/Cl.items.tlog
+/Launcher/Launcher/Launcher.tlog/link.secondary.1.tlog
