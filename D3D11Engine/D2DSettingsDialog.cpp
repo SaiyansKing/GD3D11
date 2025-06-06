@@ -13,6 +13,9 @@
 
 #include <locale>
 
+constexpr int UI_WIN_SIZE_X = 540;
+constexpr int UI_WIN_SIZE_Y = 400;
+
 Languages getUserLanguage() {
     char locale[8] = { 0 };
     GetLocaleInfoA( GetUserDefaultLangID(), LOCALE_SISO639LANGNAME, locale, sizeof( locale ) );
@@ -23,7 +26,7 @@ Languages getUserLanguage() {
 }
 
 D2DSettingsDialog::D2DSettingsDialog( D2DView* view, D2DSubView* parent ) : D2DDialog( view, parent ) {
-	SetPositionCentered( D2D1::Point2F( view->GetRenderTarget()->GetSize().width / 2, view->GetRenderTarget()->GetSize().height / 2 ), D2D1::SizeF( 520, 382 ) );
+	SetPositionCentered( D2D1::Point2F( view->GetRenderTarget()->GetSize().width / 2, view->GetRenderTarget()->GetSize().height / 2 ), D2D1::SizeF( UI_WIN_SIZE_X, UI_WIN_SIZE_Y ) );
 
 	// Get display modes
 	// TODO: reenable-superresolution, workaround: Nvidia DSR/AMD VSR
@@ -521,7 +524,7 @@ XRESULT D2DSettingsDialog::InitControls() {
 
 	SV_Label* brightnessLabel = new SV_Label( MainView, MainPanel );
 	brightnessLabel->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 150, 12 ) );
-	brightnessLabel->AlignUnder( vertFOVSlider, 16 );
+	brightnessLabel->AlignUnder( vertFOVSlider, 8 );
     switch ( userLanguage ) {
     case LANGUAGE_POLISH: brightnessLabel->SetCaption( L"Jasność:" ); break;
     default: brightnessLabel->SetCaption( L"Brightness:" ); break;
@@ -552,7 +555,7 @@ XRESULT D2DSettingsDialog::InitControls() {
 #ifdef BUILD_GOTHIC_2_6_fix
     SV_Label* windQualityLabel = new SV_Label( MainView, MainPanel );
     windQualityLabel->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 150, 12 ) );
-    windQualityLabel->AlignUnder( contrastSlider, 16 );
+    windQualityLabel->AlignUnder( contrastSlider, 8 );
     switch ( userLanguage ) {
     case LANGUAGE_POLISH: windQualityLabel->SetCaption( L"Jakość efektu wiatru [*]:" ); break;
     default: windQualityLabel->SetCaption( L"Wind effect quality [*]:" ); break;
@@ -567,18 +570,35 @@ XRESULT D2DSettingsDialog::InitControls() {
     windQualitySlider->SetMinMax( 0.0f, GothicRendererSettings::EWindQuality::WIND_QUALITY_ADVANCED );
     windQualitySlider->SetDisplayValues( { "Disabled", "Simple", "Advanced" } );
     windQualitySlider->SetValue( static_cast<float>(InitialSettings.WindQuality) );
+
+    // Wind strength
+    SV_Label* windStrengthLabel = new SV_Label( MainView, MainPanel );
+    windStrengthLabel->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 150, 12 ) );
+    windStrengthLabel->AlignUnder( windQualitySlider, 8 );
+    switch ( userLanguage ) {
+    case LANGUAGE_POLISH: windStrengthLabel->SetCaption( L"Siła wiatru:" ); break;
+    default: windStrengthLabel->SetCaption( L"Wind strength:" ); break;
+    }
+
+    SV_Slider* windStrengthSlider = new SV_Slider( MainView, MainPanel );
+    windStrengthSlider->SetPositionAndSize( D2D1::Point2F( 10, 22 ), D2D1::SizeF( 150, 15 ) );
+    windStrengthSlider->AlignUnder( windStrengthLabel, 5 );
+    windStrengthSlider->SetDataToUpdate( &Engine::GAPI->GetRendererState().RendererSettings.GlobalWindStrength );
+    windStrengthSlider->SetMinMax( 0.1f, 5.0f );
+    windStrengthSlider->SetValue( static_cast<float>(Engine::GAPI->GetRendererState().RendererSettings.GlobalWindStrength) );
+
 #endif //BUILD_GOTHIC_2_6_fix
 
     SV_Checkbox* rainCheckbox = new SV_Checkbox( MainView, MainPanel );
     rainCheckbox->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 160, 20 ) );
-    rainCheckbox->AlignUnder( contrastSlider, 65 );
+    rainCheckbox->AlignUnder( windStrengthSlider, 8 );
     switch ( userLanguage ) {
     case LANGUAGE_POLISH: rainCheckbox->SetCaption( L"Włącz Deszcz" ); break;
     default: rainCheckbox->SetCaption( L"Enable Rain" ); break;
     }
     rainCheckbox->SetDataToUpdate( &Engine::GAPI->GetRendererState().RendererSettings.EnableRain );
     rainCheckbox->SetChecked( Engine::GAPI->GetRendererState().RendererSettings.EnableRain );
-    rainCheckbox->SetPosition( D2D1::Point2F( 170 + 160 + 20, rainCheckbox->GetPosition().y ) );
+    rainCheckbox->SetPosition( D2D1::Point2F( 170 + 160 + 30, rainCheckbox->GetPosition().y ) );
 
     SV_Checkbox* rainEffectsCheckbox = new SV_Checkbox( MainView, MainPanel );
     rainEffectsCheckbox->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 160, 20 ) );
@@ -763,7 +783,7 @@ void D2DSettingsDialog::ApplyButtonPressed( SV_Button* sender, void* userdata ) 
 		Engine::GraphicsEngine->OnResize( INT2(d->Resolutions[d->ResolutionSetting].Width, d->Resolutions[d->ResolutionSetting].Height) );
         // reposition the window at the center, 
         // or we might not be able to see it 
-        d->SetPositionCentered( D2D1::Point2F( d->MainView->GetRenderTarget()->GetSize().width / 2, d->MainView->GetRenderTarget()->GetSize().height / 2 ), D2D1::SizeF( 520, 382 ) );
+        d->SetPositionCentered( D2D1::Point2F( d->MainView->GetRenderTarget()->GetSize().width / 2, d->MainView->GetRenderTarget()->GetSize().height / 2 ), D2D1::SizeF( UI_WIN_SIZE_X, UI_WIN_SIZE_Y ) );
 	}
 	Engine::GAPI->SaveRendererWorldSettings( settings );
 	Engine::GAPI->SaveMenuSettings( MENU_SETTINGS_FILE );
