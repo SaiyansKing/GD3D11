@@ -3690,10 +3690,12 @@ static void ProcessVobAnimation( zCVob* vob, zTAnimationMode aniMode, VobInstanc
         rainWeight = std::max<float>( 0.0f, std::min<float>( 1.0f, rainWeight ) );
 
         // max multiplayers when rain is 1.0 (max)
-        constexpr float rainMaxStrengthMultiplier = 3.0f;
-        constexpr float rainMaxSpeedMultiplier = 1.75f;
+        constexpr float rainMaxStrengthMultiplier = 2.75f;
+        constexpr float rainMaxSpeedMultiplier = 2.15f;
 
-        vobInstance.windStrenth = std::max<float>( 0.1f, vob->GetVisualAniModeStrength() ) * (1.0f + rainWeight * (rainMaxStrengthMultiplier - 1.0f)) * Engine::GAPI->GetRendererState().RendererSettings.GlobalWindStrength;
+        vobInstance.windStrenth = std::max<float>( 0.1f, vob->GetVisualAniModeStrength() ) * (1.0f + rainWeight * (rainMaxStrengthMultiplier - 1.0f))
+            * Engine::GAPI->GetRendererState().RendererSettings.GlobalWindStrength;
+
         vobInstance.windSpeed = 1.5f * (1.0f + rainWeight * (rainMaxSpeedMultiplier - 1.0f));
     }
 }

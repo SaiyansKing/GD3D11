@@ -1,4 +1,4 @@
-#include "D3D11GraphicsEngine.h"
+﻿#include "D3D11GraphicsEngine.h"
 
 #include "AlignedAllocator.h"
 #include "BaseAntTweakBar.h"
@@ -4232,11 +4232,9 @@ void XM_CALLCONV D3D11GraphicsEngine::DrawWorldAround( FXMVECTOR position,
             // Unbind PS
             Context->PSSetShader( nullptr, nullptr, 0 );
         }
-
-        // timer range is between 0 and 100000, for now having bugs with huge values for sin/cos
         VS_ExConstantBuffer_Wind windBuff;
-        windBuff.globalTime = static_cast<float>( Engine::GAPI->GetTotalTimeDW() % 100000 );
-        windBuff.windDir = float3( 0.3f, 0.15f, 0.5f );
+
+        //ApplyWindProps( windBuff ); // Do we need to call wind here too? Why? Or it is just common buff for shader?
 
         if ( ActiveVS ) {
             ActiveVS->GetConstantBuffer()[1]->BindToVertexShader( 1 );
@@ -4359,6 +4357,69 @@ void D3D11GraphicsEngine::UpdateMorphMeshVisual() {
     }
 }
 
+/** Updates wind direction and set time for shader */
+void D3D11GraphicsEngine::ApplyWindProps( VS_ExConstantBuffer_Wind& windBuff ) {
+
+    // Changing wind direction settings
+
+    constexpr float CHANGE_INTERVAL_MIN = 10.0f;   // seconds min
+    constexpr float CHANGE_INTERVAL_MAX = 35.0f;  // seconds max
+    constexpr float BLEND_TIME_SEC = 5.0f;      // (4 seconds to change direction)
+
+    static XMVECTOR currentDir = XMVectorSet( 0.3f, 0.15f, 0.5f, 0.0f ); // base and current direction
+
+    static XMVECTOR targetDir = currentDir;
+    static float timeToNext = CHANGE_INTERVAL_MIN;
+
+    float dt = Engine::GAPI->GetFrameTimeSec();
+
+    timeToNext -= dt;
+
+
+    // This code randomly creates wind direction in time
+    if ( timeToNext <= 0.0f ) {
+
+        XMVECTOR baseDir = XMVector3Normalize( currentDir );
+        float    baseYaw = atan2f( XMVectorGetZ( baseDir ), XMVectorGetX( baseDir ) );
+        float    basePitch = asinf( XMVectorGetY( baseDir ) );
+
+        float azimuthOffset = -XM_PIDIV2 + (static_cast<float>(std::rand()) / RAND_MAX) * XM_PI; //random angle -pi/2 to pi/2
+
+        float newYaw = baseYaw + azimuthOffset;
+
+        XMVECTOR horiz = XMVectorSet( cosf( newYaw ), 0.0f, sinf( newYaw ), 0.0f );
+        horiz = XMVector3Normalize( horiz );
+
+        float sinPitch = sinf( basePitch );
+        XMVECTOR newDir = XMVectorSet(
+            XMVectorGetX( horiz ),
+            sinPitch,
+            XMVectorGetZ( horiz ),
+            0.0f );
+
+        targetDir = XMVector3Normalize( newDir );
+        timeToNext = CHANGE_INTERVAL_MIN + (static_cast<float>(std::rand()) / RAND_MAX) * (CHANGE_INTERVAL_MAX - CHANGE_INTERVAL_MIN);
+    }
+
+
+    float lerpT = dt / BLEND_TIME_SEC;
+    
+    // Smoothly turns wind's direction when it is changing
+    currentDir = XMVector3Normalize(
+                    XMVectorLerp( currentDir, targetDir, lerpT ) );
+
+    // Sets wind dir to const buffer
+    XMStoreFloat3( reinterpret_cast<XMFLOAT3*>(&windBuff.windDir), currentDir );
+    
+    //LogInfo() << windBuff.windDir.x << " " << windBuff.windDir.y << " " << windBuff.windDir.z;
+
+    // 36 million ms = 10 hours of playing, no wind animation breaking in 10 hours
+    // when globalTime is 0, it resets shader (vertex position)
+    // so globalTime perios must be long
+    windBuff.globalTime = static_cast<float>((Engine::GAPI->GetTotalTimeDW()) % 36000000);
+
+}
+
 /** Draws the static vobs instanced */
 XRESULT D3D11GraphicsEngine::DrawVOBsInstanced() {
     START_TIMING();
@@ -4399,10 +4460,10 @@ XRESULT D3D11GraphicsEngine::DrawVOBsInstanced() {
     SetupVS_ExMeshDrawCall();
     SetupVS_ExConstantBuffer();
 
-    // timer range is between 0 and 100000, for now having bugs with huge values for sin/cos
     VS_ExConstantBuffer_Wind windBuff;
-    windBuff.globalTime = static_cast<float>( Engine::GAPI->GetTotalTimeDW() % 100000 );
-    windBuff.windDir = float3( 0.3f, 0.15f, 0.5f );
+
+    ApplyWindProps( windBuff );
+   
 
     if ( ActiveVS ) {
         ActiveVS->GetConstantBuffer()[1]->BindToVertexShader( 1 );
