@@ -246,6 +246,9 @@ public:
     /** Draws the static vobs instanced */
     XRESULT DrawVOBsInstanced();
 
+    /** Set wind props in const buffer */
+    void ApplyWindProps( VS_ExConstantBuffer_Wind& buf ); 
+
     /** Applys the lighting to the scene */
     XRESULT DrawLighting( std::vector<VobLightInfo*>& lights );
 
