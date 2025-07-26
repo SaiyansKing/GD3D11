@@ -3698,10 +3698,12 @@ static void ProcessVobAnimation( zCVob* vob, zTAnimationMode aniMode, VobInstanc
 static void CVVH_AddNotDrawnVobToList( std::vector<VobInfo*>& target, std::vector<VobInfo*>& source, float dist ) {
     std::vector<VobInfo*> remVobs;
 
+    const auto& camPos = Engine::GAPI->GetCameraPositionXM();
+
     for ( auto const& it : source ) {
         if ( !it->VisibleInRenderPass ) {
             float vd;
-            XMStoreFloat( &vd, XMVector3Length( Engine::GAPI->GetCameraPositionXM() - XMLoadFloat3( &it->LastRenderPosition ) ) );
+            XMStoreFloat( &vd, XMVector3Length( camPos - XMLoadFloat3( &it->LastRenderPosition ) ) );
             if ( vd < dist && it->Vob->GetShowVisual() ) {
                 if ( it->Vob->GetVisualAlpha() ) {
                     Engine::GAPI->TransparencyVobs.emplace_back( vd, it->Vob->GetVobTransparency(), nullptr, it );
@@ -3731,9 +3733,12 @@ static void CVVH_AddNotDrawnVobToList( std::vector<VobInfo*>& target, std::vecto
 
 static void CVVH_AddNotDrawnVobToList( std::vector<VobLightInfo*>& target, std::vector<VobLightInfo*>& source, float dist ) {
     float veclength;
+
+    const auto& camPos = Engine::GAPI->GetCameraPositionXM();
+
     for ( auto const& it : source ) {
         if ( !it->VisibleInRenderPass ) {
-            XMStoreFloat( &veclength, XMVector3Length( Engine::GAPI->GetCameraPositionXM() - it->Vob->GetPositionWorldXM() ) );
+            XMStoreFloat( &veclength, XMVector3Length( camPos - it->Vob->GetPositionWorldXM() ) );
             if ( veclength - it->Vob->GetLightRange() < dist ) {
                 target.push_back( it );
                 it->VisibleInRenderPass = true;
@@ -3744,9 +3749,12 @@ static void CVVH_AddNotDrawnVobToList( std::vector<VobLightInfo*>& target, std::
 
 static void CVVH_AddNotDrawnVobToList( std::vector<SkeletalVobInfo*>& target, std::vector<SkeletalVobInfo*>& source, float dist ) {
     float vd;
+
+    const auto& camPos = Engine::GAPI->GetCameraPositionXM();
+
     for ( auto const& it : source ) {
         if ( !it->VisibleInRenderPass ) {
-            XMStoreFloat( &vd, XMVector3Length( Engine::GAPI->GetCameraPositionXM() - it->Vob->GetPositionWorldXM() ) );
+            XMStoreFloat( &vd, XMVector3Length( camPos - it->Vob->GetPositionWorldXM() ) );
             if ( vd < dist && it->Vob->GetShowVisual() ) {
                 target.push_back( it );
                 it->VisibleInRenderPass = true;
@@ -3763,6 +3771,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
     const float vobSmallSize = Engine::GAPI->GetRendererState().RendererSettings.SmallVobSize;
     const float visualFXDrawRadius = Engine::GAPI->GetRendererState().RendererSettings.VisualFXDrawRadius;
     const XMFLOAT3 camPos = Engine::GAPI->GetCameraPosition();
+    const FXMVECTOR cameraPosition = Engine::GAPI->GetCameraPositionXM();
 
     while ( base->OriginalNode ) {
         // Check for occlusion-culling
@@ -3798,7 +3807,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
 
         if ( base->OriginalNode->IsLeaf() ) {
             // Check if this leaf is inside the frustum
-            bool insideFrustum = true;
+        
 
             zCBspLeaf* leaf = static_cast<zCBspLeaf*>(base->OriginalNode);
             std::vector<VobInfo*>& listA = base->IndoorVobs;
@@ -3810,7 +3819,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
             const float dist = Toolbox::ComputePointAABBDistance( camPos, base->OriginalNode->BBox3D.Min, base->OriginalNode->BBox3D.Max );
             // float dist = XMVector3Length(XMLoadFloat3(&base->BBox3D.Min) - XMLoadFloat3(&camPos));
 
-            if ( insideFrustum ) {
+           
                 if ( Engine::GAPI->GetRendererState().RendererSettings.DrawVOBs ) {
                     if ( dist < vobIndoorDist ) {
                         CVVH_AddNotDrawnVobToList( vobs, listA, vobIndoorDist );
@@ -3819,13 +3828,13 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
                     if ( dist < vobOutdoorSmallDist ) {
                         CVVH_AddNotDrawnVobToList( vobs, listB, vobOutdoorSmallDist );
                     }
-                }
 
-                if ( dist < vobOutdoorDist ) {
-                    if ( Engine::GAPI->GetRendererState().RendererSettings.DrawVOBs ) {
+                    if ( dist < vobOutdoorDist ) {
                         CVVH_AddNotDrawnVobToList( vobs, listC, vobOutdoorDist );
                     }
                 }
+
+                
 
                 if ( Engine::GAPI->GetRendererState().RendererSettings.DrawMobs && dist < vobOutdoorSmallDist ) {
                     CVVH_AddNotDrawnVobToList( mobs, listD, vobOutdoorDist );
@@ -3835,7 +3844,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
                     // Add dynamic lights
                     float minDynamicUpdateLightRange = Engine::GAPI->GetRendererState().RendererSettings.MinLightShadowUpdateRange;
                     XMVECTOR playerPosition = Engine::GAPI->GetPlayerVob() != nullptr ? Engine::GAPI->GetPlayerVob()->GetPositionWorldXM() : XMVectorSet( FLT_MAX, FLT_MAX, FLT_MAX, 0 );
-                    FXMVECTOR cameraPosition = Engine::GAPI->GetCameraPositionXM();
+                    
 
                     // Take cameraposition if we are freelooking
                     if ( zCCamera::IsFreeLookActive() ) {
@@ -3892,7 +3901,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
                         }
                     }
                 }
-            }
+            
             return;
         } else {
             zCBspNode* node = static_cast<zCBspNode*>(base->OriginalNode);
@@ -3904,7 +3913,7 @@ void GothicAPI::CollectVisibleVobsHelper( BspInfo* base, zTBBox3D boxCell, int c
 
             zTBBox3D tmpbox = boxCell;
             float plane_normal;
-            XMStoreFloat( &plane_normal, XMVector3Dot( XMLoadFloat3( &node->Plane.Normal ), GetCameraPositionXM() ) );
+            XMStoreFloat( &plane_normal, XMVector3Dot( XMLoadFloat3( &node->Plane.Normal ), cameraPosition ) );
             if ( plane_normal > node->Plane.Distance ) {
                 if ( node->Front ) {
                     reinterpret_cast<float*>(&tmpbox.Min)[planeAxis] = node->Plane.Distance;
