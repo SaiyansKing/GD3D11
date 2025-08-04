@@ -190,4 +190,10 @@ extern "C"
         structSize = sizeof( Engine::GAPI->GetRendererState().RendererSettings );
         return &Engine::GAPI->GetRendererState().RendererSettings;
     }
+
+    /** Save Renderer Settings */
+    __declspec(dllexport) void __cdecl GDX_SaveRendererSettings() {
+        Engine::GAPI->SaveRendererWorldSettings( Engine::GAPI->GetRendererState().RendererSettings );
+        Engine::GAPI->SaveMenuSettings( MENU_SETTINGS_FILE );
+    }
 };
