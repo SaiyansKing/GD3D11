@@ -496,6 +496,14 @@ XRESULT D3D11GraphicsEngine::Init() {
         DrawMultiIndexedInstancedIndirect = Stub_DrawMultiIndexedInstancedIndirect;
     }
 
+    // Force Feature Level 10 compatibility mode if Multi Draw Indirect is not available
+    // This fixes performance issues on virtualized environments (e.g., Parallels Desktop on Mac)
+    // where Multi Draw Indirect extensions are not supported and fallback is too slow
+    if ( DrawMultiIndexedInstancedIndirect == Stub_DrawMultiIndexedInstancedIndirect ) {
+        FeatureLevel10Compatibility = true;
+        LogInfo() << "Multi Draw Indirect not available, forcing Feature Level 10 compatibility mode for better performance";
+    }
+
     if ( !BeginUAVOverlap || !EndUAVOverlap ) {
         BeginUAVOverlap = Stub_BeginUAVOverlap;
         EndUAVOverlap = Stub_EndUAVOverlap;
