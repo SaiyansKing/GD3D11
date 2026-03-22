@@ -4530,7 +4530,7 @@ XRESULT GothicAPI::SaveMenuSettings( const std::string& file ) {
     WritePrivateProfileStringA( "Display", "StretchWindow", std::to_string( s.StretchWindow ? TRUE : FALSE ).c_str(), ini.c_str() );
     WritePrivateProfileStringA( "Display", "UIScale", std::to_string( s.GothicUIScale ).c_str(), ini.c_str() );
     WritePrivateProfileStringA( "Display", "Rain", std::to_string( s.EnableRain ? TRUE : FALSE ).c_str(), ini.c_str() );
-    WritePrivateProfileStringA( "Display", "RainEffects", std::to_string( s.EnableRainEffects ? TRUE : FALSE ).c_str(), ini.c_str() );
+    WritePrivateProfileStringA( "Display", "RainEffectsQuality", std::to_string( s.RainEffectsQuality ).c_str(), ini.c_str() );
     WritePrivateProfileStringA( "Display", "LimitLightIntesity", std::to_string( s.LimitLightIntesity ? TRUE : FALSE ).c_str(), ini.c_str() );
     WritePrivateProfileStringA( "Display", "WindQuality", std::to_string( s.WindQuality ).c_str(), ini.c_str() );
     WritePrivateProfileStringA( "Display", "WindStrength", std::to_string( s.GlobalWindStrength ).c_str(), ini.c_str() );
@@ -4648,7 +4648,13 @@ XRESULT GothicAPI::LoadMenuSettings( const std::string& file ) {
         s.StretchWindow = GetPrivateProfileBoolA( "Display", "StretchWindow", false, ini );
         s.GothicUIScale = GetPrivateProfileFloatA( "Display", "UIScale", 1.0f, ini );
         s.EnableRain = GetPrivateProfileBoolA( "Display", "Rain", true, ini );
-        s.EnableRainEffects = GetPrivateProfileBoolA( "Display", "RainEffects", true, ini );
+        // Load RainEffectsQuality with backward compatibility (old bool RainEffects: true -> ADVANCED, false -> DISABLED)
+        s.RainEffectsQuality = GetPrivateProfileIntA( "Display", "RainEffectsQuality", -1, ini.c_str() );
+        if ( s.RainEffectsQuality == -1 ) {
+            // Fallback to old setting
+            bool oldRainEffects = GetPrivateProfileBoolA( "Display", "RainEffects", true, ini );
+            s.RainEffectsQuality = oldRainEffects ? GothicRendererSettings::RAIN_QUALITY_ADVANCED : GothicRendererSettings::RAIN_QUALITY_DISABLED;
+        }
         s.LimitLightIntesity = GetPrivateProfileBoolA( "Display", "LimitLightIntesity", false, ini );
         s.WindQuality = GetPrivateProfileIntA( "Display", "WindQuality", 0, ini.c_str() );
         s.GlobalWindStrength = GetPrivateProfileFloatA( "Display", "WindStrength", 1.0f, ini );

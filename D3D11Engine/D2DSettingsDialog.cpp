@@ -14,7 +14,7 @@
 #include <locale>
 
 constexpr int UI_WIN_SIZE_X = 540;
-constexpr int UI_WIN_SIZE_Y = 410;
+constexpr int UI_WIN_SIZE_Y = 440;
 
 #if defined(BUILD_GOTHIC_1_08k) && !defined(BUILD_1_12F)
 extern bool haveWindAnimations;
@@ -612,20 +612,28 @@ XRESULT D2DSettingsDialog::InitControls() {
     rainCheckbox->SetChecked( Engine::GAPI->GetRendererState().RendererSettings.EnableRain );
     rainCheckbox->SetPosition( D2D1::Point2F( 170 + 160 + 30, rainCheckbox->GetPosition().y ) );
 
-    SV_Checkbox* rainEffectsCheckbox = new SV_Checkbox( MainView, MainPanel );
-    rainEffectsCheckbox->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 160, 20 ) );
-    rainEffectsCheckbox->AlignUnder( rainCheckbox, 5 );
+    // Rain effects quality slider
+    SV_Label* rainEffectsLabel = new SV_Label( MainView, MainPanel );
+    rainEffectsLabel->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 150, 12 ) );
+    rainEffectsLabel->AlignUnder( rainCheckbox, 8 );
     switch ( userLanguage ) {
-    case LANGUAGE_POLISH: rainEffectsCheckbox->SetCaption( L"Włącz Efekty Deszczu" ); break;
-    default: rainEffectsCheckbox->SetCaption( L"Enable Rain Effects" ); break;
+    case LANGUAGE_POLISH: rainEffectsLabel->SetCaption( L"Jakość Efektów Deszczu:" ); break;
+    default: rainEffectsLabel->SetCaption( L"Rain Effects Quality:" ); break;
     }
-    rainEffectsCheckbox->SetDataToUpdate( &Engine::GAPI->GetRendererState().RendererSettings.EnableRainEffects );
-    rainEffectsCheckbox->SetChecked( Engine::GAPI->GetRendererState().RendererSettings.EnableRainEffects );
+
+    SV_Slider* rainEffectsSlider = new SV_Slider( MainView, MainPanel );
+    rainEffectsSlider->SetPositionAndSize( D2D1::Point2F( 10, 22 ), D2D1::SizeF( 150, 15 ) );
+    rainEffectsSlider->AlignUnder( rainEffectsLabel, 5 );
+    rainEffectsSlider->SetDataToUpdate( reinterpret_cast<int*>(&Engine::GAPI->GetRendererState().RendererSettings.RainEffectsQuality) );
+    rainEffectsSlider->SetIsIntegralSlider( true );
+    rainEffectsSlider->SetMinMax( 0.0f, GothicRendererSettings::ERainEffectsQuality::RAIN_QUALITY_ADVANCED );
+    rainEffectsSlider->SetDisplayValues( { "Disabled", "Simple", "Advanced" } );
+    rainEffectsSlider->SetValue( static_cast<float>(Engine::GAPI->GetRendererState().RendererSettings.RainEffectsQuality) );
 
     InitialSettings.EnableWaterAnimation = Engine::GAPI->GetRendererState().RendererSettings.EnableWaterAnimation;
     SV_Checkbox* waterWaveCheckbox = new SV_Checkbox( MainView, MainPanel );
     waterWaveCheckbox->SetPositionAndSize( D2D1::Point2F( 10, 10 ), D2D1::SizeF( 160, 20 ) );
-    waterWaveCheckbox->AlignUnder( rainEffectsCheckbox, 5 );
+    waterWaveCheckbox->AlignUnder( rainEffectsSlider, 5 );
     switch ( userLanguage ) {
     case LANGUAGE_POLISH: waterWaveCheckbox->SetCaption( L"Włącz Efekty Fali [*]" ); break;
     default: waterWaveCheckbox->SetCaption( L"Enable Water Waves [*]" ); break;

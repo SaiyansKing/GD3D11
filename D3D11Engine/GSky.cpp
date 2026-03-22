@@ -291,12 +291,16 @@ XRESULT GSky::RenderSky() {
     AtmosphereCB.AC_g = Atmosphere.G;
     AtmosphereCB.AC_Wavelength = Atmosphere.WaveLengths;
     AtmosphereCB.AC_SpherePosition = sp;
-    if ( !Engine::GAPI->GetRendererState().RendererSettings.EnableRainEffects ) {
+    // Handle rain effects based on quality setting
+    int rainEffectsQuality = Engine::GAPI->GetRendererState().RendererSettings.RainEffectsQuality;
+    if ( rainEffectsQuality == GothicRendererSettings::RAIN_QUALITY_DISABLED ) {
         AtmosphereCB.AC_SceneWettness = 0.f;
     } else {
+        // RAIN_QUALITY_SIMPLE and RAIN_QUALITY_ADVANCED - shader handles the 0.25 multiplier for Simple
         AtmosphereCB.AC_SceneWettness = Engine::GAPI->GetSceneWetness();
     }
     AtmosphereCB.AC_RainFXWeight = Engine::GAPI->GetRainFXWeight();
+    AtmosphereCB.AC_RainEffectsQuality = rainEffectsQuality;
 
     //Engine::GraphicsEngine->DrawSky();
 

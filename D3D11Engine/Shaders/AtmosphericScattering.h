@@ -32,6 +32,9 @@ cbuffer Atmosphere : register( b1 )
 
 	float3 AC_SpherePosition;
 	float AC_RainFXWeight;
+
+	int AC_RainEffectsQuality;
+	float3 AC_Pad;
 };
 
 // The scale equation calculated by Vernier's Graphical Analysis

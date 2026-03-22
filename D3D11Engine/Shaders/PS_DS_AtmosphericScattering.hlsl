@@ -242,6 +242,12 @@ void ApplySceneWettness(float3 wsPosition, float3 vsPosition, float3 vsDir, inou
 	ApplyRainNormalDeformation(nrm, wsPosition, diffuse.rgb, wsNormal);
 	pixelWettnes *= 1 - pow(saturate(dot(wsNormal, float3(0,-1,0))), 4.0f);
 	
+	// Apply quality multiplier: Simple = disabled, Advanced = full
+	if (AC_RainEffectsQuality == 1) // RAIN_QUALITY_SIMPLE
+	{
+		pixelWettnes = 0; // Completely disable wet surface effects for Simple mode
+	}
+	
 	vsNormal = lerp(vsNormal, nrm, AC_RainFXWeight * pixelWettnes * 0.5f); // Only apply deformation if it's actually raining
 	
 	// Get fresnel-effect

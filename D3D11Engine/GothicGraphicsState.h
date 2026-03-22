@@ -516,6 +516,11 @@ struct GothicRendererSettings {
         WIND_QUALITY_NONE = 0,
         WIND_QUALITY_ADVANCED,
     };
+    enum ERainEffectsQuality {
+        RAIN_QUALITY_DISABLED = 0,
+        RAIN_QUALITY_SIMPLE,
+        RAIN_QUALITY_ADVANCED,
+    };
 
 
     /** Sets the default values for this struct */
@@ -647,7 +652,7 @@ struct GothicRendererSettings {
         RainFogDensity = 0.00050f;
 
         EnableRain = true;
-        EnableRainEffects = true;
+        RainEffectsQuality = RAIN_QUALITY_ADVANCED;
 
         GodRayDecay = 0.97f;
         GodRayWeight = 0.85f;
@@ -817,7 +822,7 @@ struct GothicRendererSettings {
     float RainFogDensity;
 
     bool EnableRain;
-    bool EnableRainEffects;
+    int RainEffectsQuality;
 
     bool LimitLightIntesity;
     bool AllowNormalmaps;
