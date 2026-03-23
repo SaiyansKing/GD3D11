@@ -23,6 +23,34 @@
 #include "D3D7\MyDirectDrawSurface7.h"
 #include "zCQuadMark.h"
 
+
+struct ScopedTimer {
+    std::string name;
+    std::chrono::high_resolution_clock::time_point start;
+
+    ScopedTimer( const std::string& name ) : name( name ) {
+        start = std::chrono::high_resolution_clock::now();
+    }
+
+    void ScopedStop()
+    {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        LogInfo() << "[PROFILE] " << name << ": " << (duration / 1000.0f) << " ms";
+    }
+
+    void ScopedStopSum( double& sum )
+    {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        sum += duration / 1000.0f;
+        LogInfo() << "[PROFILE_SUM] " << name << ": " << (duration / 1000.0f) << "ms | Sum: " << sum << " ms";
+    }
+
+};
+
 WorldConverter::WorldConverter() {}
 
 WorldConverter::~WorldConverter() {}
@@ -330,12 +358,54 @@ XRESULT WorldConverter::LoadWorldMeshFromFile( const std::string& file, std::map
     return XR_SUCCESS;
 }
 
+
+static thread_local std::unordered_map<zCTexture*, bool> g_waterfallCache;
+
+
+/** Cleans textures map when a new location is loading */
+void ClearWaterfallCache() {
+    g_waterfallCache.clear();
+}
+
 bool AdditionalCheckWaterFall(zCTexture* texture)
 {
     if ( !texture ) {
         return false;
     }
 
+    auto it = g_waterfallCache.find( texture );
+    if ( it != g_waterfallCache.end() ) {
+        return it->second;
+    }
+
+    std::string textureName = texture->GetName();
+
+    std::transform( textureName.begin(), textureName.end(), textureName.begin(), ::toupper );
+
+    bool isWaterfall = false;
+
+
+    if ( textureName.find( "FALL" ) != std::string::npos ) {
+#ifdef BUILD_GOTHIC_2_6_fix
+        if ( textureName.find( "A0" ) != std::string::npos &&
+             textureName.find( "SURFACE" ) == std::string::npos &&
+             textureName.find( "STONE" ) == std::string::npos ) {
+            isWaterfall = true;
+        }
+#else
+        if ( textureName.find( "SURFACE" ) != std::string::npos ||
+             textureName.find( "STONE" ) != std::string::npos ) {
+            isWaterfall = true;
+        }
+#endif
+    }
+
+  
+    g_waterfallCache[texture] = isWaterfall;
+
+    return isWaterfall;
+
+    /*
     std::string textureName = texture->GetName();
     std::transform( textureName.begin(), textureName.end(), textureName.begin(), toupper );
 #ifdef BUILD_GOTHIC_2_6_fix
@@ -348,13 +418,28 @@ bool AdditionalCheckWaterFall(zCTexture* texture)
         return true;
     }
     return false;
+    */
 }
 
 /** Converts the worldmesh into a more usable format */
 HRESULT WorldConverter::ConvertWorldMesh( zCPolygon** polys, unsigned int numPolygons, std::map<int, std::map<int, WorldMeshSectionInfo>>* outSections, WorldInfo* info, MeshInfo** outWrappedMesh, bool indoorLocation ) {
+    
+
+    ScopedTimer timerCheck1( "ConvertWorldMesh #1: " );
+
+    LogInfo() << "PolysCount: " << numPolygons << " | " << info->WorldName;
+
+    ClearWaterfallCache();
+
+    std::vector<ExVertexStruct> polyVertices;
+    polyVertices.reserve( 16 );
+
+
     // Go through every polygon and put it into its section
     for ( unsigned int i = 0; i < numPolygons; i++ ) {
         zCPolygon* poly = polys[i];
+
+        polyVertices.clear();
 
         // Check if we even need this polygon
         if ( poly->GetPolyFlags()->GhostOccluder ) {
@@ -421,9 +506,13 @@ HRESULT WorldConverter::ConvertWorldMesh( zCPolygon** polys, unsigned int numPol
         }
 #endif
 
+        
         // Extract poly vertices
+        /*
         std::vector<ExVertexStruct> polyVertices;
         polyVertices.reserve( poly->GetNumPolyVertices() );
+        */
+
         for ( int v = 0; v < poly->GetNumPolyVertices(); v++ ) {
             zCVertex* vertex = poly->getVertices()[v];
             zCVertFeature* feature = poly->getFeatures()[v];
@@ -503,64 +592,126 @@ HRESULT WorldConverter::ConvertWorldMesh( zCPolygon** polys, unsigned int numPol
         }
     }
 
+    timerCheck1.ScopedStop();
+    ScopedTimer timerCheck2( "ConvertWorldMesh #2: " );
+    ScopedTimer timerCheck21( "ConvertWorldMesh #2-1 (Multithreaded): " );
+
+    // --- 1. Preparing data ---
+    std::vector<std::vector<ExVertexStruct>*> vertexBuffers;
+    std::vector<std::vector<VERTEX_INDEX>*> indexBuffers;
+    vertexBuffers.reserve( 2500 );
+    indexBuffers.reserve( 2500 );
+
+    struct MeshTask {
+        WorldMeshInfo* Mesh;
+    };
+
+    std::vector<MeshTask> tasks;
+    tasks.reserve( 2500 );
+
     XMVECTOR avgSections = XMVectorZero();
     int numSections = 0;
 
-    std::list<std::vector<ExVertexStruct>*> vertexBuffers;
-    std::list<std::vector<VERTEX_INDEX>*> indexBuffers;
-
-    // Create the vertexbuffers for every material
-    for ( auto const& itx : *outSections ) {
-        for ( auto const& ity : itx.second ) {
+    // Quick task collection
+    for ( auto& itx : *outSections ) {
+        for ( auto& ity : itx.second ) {
             numSections++;
-            avgSections += XMVectorSet( (float)itx.first, (float)ity.first, 0, 0 );
+            float sx = (float)itx.first;
+            float sy = (float)ity.first;
+            avgSections += XMVectorSet( sx, sy, 0, 0 );
 
-            for ( auto const& it : ity.second.WorldMeshes ) {
-                std::vector<ExVertexStruct> indexedVertices;
-                std::vector<VERTEX_INDEX> indices;
-                IndexVertices( &it.second->Vertices[0], it.second->Vertices.size(), indexedVertices, indices );
-
-                it.second->Vertices = indexedVertices;
-                it.second->Indices = indices;
-
-                // Create the buffers
-                Engine::GraphicsEngine->CreateVertexBuffer( &it.second->MeshVertexBuffer );
-                Engine::GraphicsEngine->CreateVertexBuffer( &it.second->MeshIndexBuffer );
-
-                // Generate normals
-                GenerateVertexNormals( it.second->Vertices, it.second->Indices );
-
-                // Optimize faces
-                it.second->MeshVertexBuffer->OptimizeFaces( &it.second->Indices[0],
-                    reinterpret_cast<byte*>(&it.second->Vertices[0]),
-                    it.second->Indices.size(),
-                    it.second->Vertices.size(),
-                    sizeof( ExVertexStruct ) );
-
-                // Then optimize vertices
-                it.second->MeshVertexBuffer->OptimizeVertices( &it.second->Indices[0],
-                    reinterpret_cast<byte*>(&it.second->Vertices[0]),
-                    it.second->Indices.size(),
-                    it.second->Vertices.size(),
-                    sizeof( ExVertexStruct ) );
-
-                // Init and fill them
-                it.second->MeshVertexBuffer->Init( &it.second->Vertices[0], it.second->Vertices.size() * sizeof( ExVertexStruct ), D3D11VertexBuffer::B_VERTEXBUFFER, D3D11VertexBuffer::U_IMMUTABLE );
-                it.second->MeshIndexBuffer->Init( &it.second->Indices[0], it.second->Indices.size() * sizeof( VERTEX_INDEX ), D3D11VertexBuffer::B_INDEXBUFFER, D3D11VertexBuffer::U_IMMUTABLE );
-
-                // Remember them, to wrap then up later
-                vertexBuffers.emplace_back( &it.second->Vertices );
-                indexBuffers.emplace_back( &it.second->Indices );
+            for ( auto& it : ity.second.WorldMeshes ) {
+                tasks.push_back( { it.second } );
             }
         }
     }
+
+    // Multithreaded Processing (CPU)
+    unsigned int numThreads = std::thread::hardware_concurrency();
+    if ( numThreads == 0 ) numThreads = 2; // Fallback
+
+    // We break tasks into chunks
+    size_t totalTasks = tasks.size();
+    size_t batchSize = (totalTasks + numThreads - 1) / numThreads;
+
+    std::vector<std::thread> workers;
+    workers.reserve( numThreads );
+
+    for ( unsigned int t = 0; t < numThreads; ++t ) {
+        workers.emplace_back( [&tasks, t, batchSize, totalTasks]() {
+
+            // Calculate the range for this stream
+            size_t start = t * batchSize;
+            size_t end = std::min( start + batchSize, totalTasks );
+
+            if ( start >= end ) return;
+
+            // Thread-local buffers (Hoisting within a thread)
+            std::vector<ExVertexStruct> localTempVerts;
+            std::vector<VERTEX_INDEX> localTempIndices;
+            localTempVerts.reserve( 4096 );
+            localTempIndices.reserve( 8192 );
+
+            for ( size_t i = start; i < end; ++i ) {
+                WorldMeshInfo* mesh = tasks[i].Mesh;
+
+                localTempVerts.clear();
+                localTempIndices.clear();
+
+                IndexVertices( mesh->Vertices.data(), mesh->Vertices.size(), localTempVerts, localTempIndices );
+
+                // Save the result into the mesh structure
+                mesh->Vertices = localTempVerts;
+                mesh->Indices = localTempIndices;
+
+                GenerateVertexNormals( mesh->Vertices, mesh->Indices );
+
+            }
+        } );
+    }
+
+
+    for ( auto& worker : workers ) {
+        if ( worker.joinable() ) {
+            worker.join();
+        }
+    }
+
+
+    for ( const auto& task : tasks ) {
+        WorldMeshInfo* mesh = task.Mesh;
+
+        Engine::GraphicsEngine->CreateVertexBuffer( &mesh->MeshVertexBuffer );
+        Engine::GraphicsEngine->CreateVertexBuffer( &mesh->MeshIndexBuffer );
+
+
+        mesh->MeshVertexBuffer->Init(
+            mesh->Vertices.data(),
+            mesh->Vertices.size() * sizeof( ExVertexStruct ),
+            D3D11VertexBuffer::B_VERTEXBUFFER,
+            D3D11VertexBuffer::U_IMMUTABLE
+        );
+        mesh->MeshIndexBuffer->Init(
+            mesh->Indices.data(),
+            mesh->Indices.size() * sizeof( VERTEX_INDEX ),
+            D3D11VertexBuffer::B_INDEXBUFFER,
+            D3D11VertexBuffer::U_IMMUTABLE
+        );
+
+        vertexBuffers.push_back( &mesh->Vertices );
+        indexBuffers.push_back( &mesh->Indices );
+
+
+    }
+
+    timerCheck21.ScopedStop();
 
     std::vector<ExVertexStruct> wrappedVertices;
     std::vector<unsigned int> wrappedIndices;
     std::vector<unsigned int> offsets;
 
     // Calculate fat vertexbuffer
-    WorldConverter::WrapVertexBuffers( vertexBuffers, indexBuffers, wrappedVertices, wrappedIndices, offsets );
+    WorldConverter::WrapVertexBuffers_Mesh( vertexBuffers, indexBuffers, wrappedVertices, wrappedIndices, offsets );
 
     // Propergate the offsets
     int i = 0;
@@ -601,6 +752,8 @@ HRESULT WorldConverter::ConvertWorldMesh( zCPolygon** polys, unsigned int numPol
         info->HighestVertex = 0;
     }
     //SaveSectionsToObjUnindexed("Test.obj", (*outSections));
+
+    timerCheck2.ScopedStop();
 
     return XR_SUCCESS;
 }
@@ -1196,6 +1349,7 @@ void WorldConverter::UpdateMorphMeshVisual( void* v, MeshVisualInfo* meshInfo ) 
 
 /** Extracts a 3DS-Mesh from a zCVisual */
 void WorldConverter::Extract3DSMeshFromVisual2( zCProgMeshProto* visual, MeshVisualInfo* meshInfo ) {
+
     XMFLOAT3 bbmin = XMFLOAT3( FLT_MAX, FLT_MAX, FLT_MAX );
     XMFLOAT3 bbmax = XMFLOAT3( -FLT_MAX, -FLT_MAX, -FLT_MAX );
 
@@ -1337,6 +1491,8 @@ void WorldConverter::Extract3DSMeshFromVisual2( zCProgMeshProto* visual, MeshVis
 
     meshInfo->Visual = visual;
     meshInfo->VisualName = visual->GetObjectName();
+
+    
 }
 
 const float eps = 0.001f;
@@ -1472,6 +1628,7 @@ void WorldConverter::MarkEdges( std::vector<ExVertexStruct>& vertices, std::vect
 }
 
 /** Builds a big vertexbuffer from the world sections */
+/*
 void WorldConverter::WrapVertexBuffers( const std::list<std::vector<ExVertexStruct>*>& vertexBuffers,
     const std::list<std::vector<VERTEX_INDEX>*>& indexBuffers,
     std::vector<ExVertexStruct>& outVertices,
@@ -1499,6 +1656,142 @@ void WorldConverter::WrapVertexBuffers( const std::list<std::vector<ExVertexStru
         outOffsets.emplace_back( outOffsets.back() + iti->size() );
     }
 }
+*/
+
+
+// WorldConverter.cpp
+
+void WorldConverter::WrapVertexBuffers_Mesh(
+    const std::vector<std::vector<ExVertexStruct>*>& vertexBuffers,
+    const std::vector<std::vector<VERTEX_INDEX>*>& indexBuffers,
+    std::vector<ExVertexStruct>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    std::vector<unsigned int>& outOffsets )
+{
+    size_t totalVerts = 0;
+    for ( const auto* vec : vertexBuffers ) {
+        if ( vec ) totalVerts += vec->size();
+    }
+
+    size_t totalIndices = 0;
+    for ( const auto* vec : indexBuffers ) {
+        if ( vec ) totalIndices += vec->size();
+    }
+
+    outVertices.resize( totalVerts );
+    outIndices.resize( totalIndices );
+
+    outOffsets.clear();
+    outOffsets.reserve( indexBuffers.size() + 1 );
+    outOffsets.push_back( 0 );
+
+    ExVertexStruct* destVertsPtr = outVertices.data();
+    unsigned int* destIndicesPtr = outIndices.data();
+
+    unsigned int currentVertexOffset = 0;
+    unsigned int currentIndexOffset = 0;
+
+
+    size_t numBuffers = vertexBuffers.size();
+
+    for ( size_t i = 0; i < numBuffers; ++i ) {
+        const std::vector<ExVertexStruct>* vSrc = vertexBuffers[i];
+        const std::vector<VERTEX_INDEX>* iSrc = indexBuffers[i];
+
+        if ( !vSrc || !iSrc ) continue;
+
+        size_t vSize = vSrc->size();
+        size_t iSize = iSrc->size();
+
+
+        if ( vSize > 0 ) {
+            memcpy( destVertsPtr, vSrc->data(), vSize * sizeof( ExVertexStruct ) );
+            destVertsPtr += vSize;
+        }
+
+        if ( iSize > 0 ) {
+            const VERTEX_INDEX* srcIndices = iSrc->data();
+
+            for ( size_t k = 0; k < iSize; ++k ) {
+                destIndicesPtr[k] = srcIndices[k] + currentVertexOffset;
+            }
+
+            destIndicesPtr += iSize;
+        }
+
+        currentVertexOffset += static_cast<unsigned int>( vSize );
+        currentIndexOffset += static_cast<unsigned int>( iSize );
+
+        outOffsets.push_back( currentIndexOffset );
+    }
+}
+
+/** Builds a big vertexbuffer from the world sections, new OPTIMIZED */
+void WorldConverter::WrapVertexBuffers( const std::list<std::vector<ExVertexStruct>*>& vertexBuffers,
+    const std::list<std::vector<VERTEX_INDEX>*>& indexBuffers,
+    std::vector<ExVertexStruct>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    std::vector<unsigned int>& outOffsets ) {
+
+    // 1. Preliminary size calculation, no realloc
+    size_t totalVerts = 0;
+    for ( const auto* vec : vertexBuffers ) totalVerts += vec->size();
+
+    size_t totalIndices = 0;
+    for ( const auto* vec : indexBuffers ) totalIndices += vec->size();
+
+    // 2. Allocate memory once
+    outVertices.resize( totalVerts );
+    outIndices.resize( totalIndices );
+
+    outOffsets.clear();
+    outOffsets.reserve( indexBuffers.size() + 1 );
+    outOffsets.push_back( 0 );
+
+    // 3. Direct memory access
+    ExVertexStruct* destVertsPtr = outVertices.data();
+    unsigned int* destIndicesPtr = outIndices.data();
+
+    unsigned int currentVertexOffset = 0;
+    unsigned int currentIndexOffset = 0;
+
+    // 4. Combined pass for cache locality
+    auto itV = vertexBuffers.begin();
+    auto itI = indexBuffers.begin();
+    auto endV = vertexBuffers.end();
+
+    while ( itV != endV ) {
+        const std::vector<ExVertexStruct>* vSrc = *itV;
+        const std::vector<VERTEX_INDEX>* iSrc = *itI;
+
+        size_t vSize = vSrc->size();
+        size_t iSize = iSrc->size();
+
+        // A. Fast Vertex Copying (ExVertexStruct Safe)
+        if ( vSize > 0 ) {
+            memcpy( destVertsPtr, vSrc->data(), vSize * sizeof( ExVertexStruct ) );
+            destVertsPtr += vSize;
+        }
+
+        // B. Copying indexes with offset
+        if ( iSize > 0 ) {
+            const VERTEX_INDEX* srcIndices = iSrc->data();
+            for ( size_t k = 0; k < iSize; ++k ) {
+                destIndicesPtr[k] = srcIndices[k] + currentVertexOffset;
+            }
+            destIndicesPtr += iSize;
+        }
+
+        currentVertexOffset += static_cast<unsigned int>( vSize );
+        currentIndexOffset += static_cast<unsigned int>( iSize );
+        outOffsets.push_back( currentIndexOffset );
+
+        ++itV;
+        ++itI;
+    }
+
+}
+
 
 /** Caches a mesh */
 void WorldConverter::CacheMesh( const std::map<std::string, std::vector<std::pair<std::vector<ExVertexStruct>, std::vector<VERTEX_INDEX>>>> geometry, const std::string& file ) {

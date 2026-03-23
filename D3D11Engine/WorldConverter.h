@@ -88,6 +88,9 @@ public:
     /** Builds a big vertexbuffer from the world sections */
     static void WrapVertexBuffers( const std::list<std::vector<ExVertexStruct>*>& vertexBuffers, const std::list<std::vector<VERTEX_INDEX>*>& indexBuffers, std::vector<ExVertexStruct>& outVertices, std::vector<unsigned int>& outIndices, std::vector<unsigned int>& outOffsets );
 
+    /** Builds a big vertexbuffer from the world sections, special case */
+    static void WrapVertexBuffers_Mesh( const std::vector<std::vector<ExVertexStruct>*>& vertexBuffers, const std::vector<std::vector<VERTEX_INDEX>*>& indexBuffers, std::vector<ExVertexStruct>& outVertices,  std::vector<unsigned int>& outIndices, std::vector<unsigned int>& outOffsets );
+
     /** Caches a mesh */
     static void CacheMesh( const std::map<std::string, std::vector<std::pair<std::vector<ExVertexStruct>, std::vector<VERTEX_INDEX>>>> geometry, const std::string& file );
 
